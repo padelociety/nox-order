@@ -346,11 +346,65 @@ const DATA = {"rackets": [{"ref": "PACKPATLTD26", "name": "PACK AT10 GENIUS 12K 
 const ADMIN_PW = 'ps2025';
 
 // ── SETTINGS ──────────────────────────────────────────
+const SHEET_URL='https://script.google.com/macros/s/AKfycby3X6Co_DVbvN36MN5MFncsX-C8-pFtedeaCTRbOqrLlJt5rR1ze2kFyFDYbvdqKvpy/exec';
 const DEF={rate:1550,disc:{rackets:30,shoes:25,bags:25,accessories:20,textile:20},email:'order@padelsociety.kr',notice:''};
-function cfg(){try{const s=JSON.parse(localStorage.getItem('nox_cfg')||'{}');return Object.assign({},DEF,s,{disc:Object.assign({},DEF.disc,s.disc||{})});}catch{return DEF;}}
-function saveCfg(s){localStorage.setItem('nox_cfg',JSON.stringify(s));}
-function getHidden(){try{return JSON.parse(localStorage.getItem('nox_hidden')||'[]');}catch{return [];}}
-function saveHidden(arr){localStorage.setItem('nox_hidden',JSON.stringify(arr));}
+// ── 세팅 저장소: Google Sheets ─────────────────────────
+var _cfgCache=null;
+var _hiddenCache=null;
+var _imgOverrideCache=null;
+var _settingsPending=false;
+
+function _saveAllSettings(){
+  if(_settingsPending) return;
+  _settingsPending=true;
+  var payload=JSON.stringify({
+    cfg:_cfgCache,
+    hidden:_hiddenCache||[],
+    imgOverrides:_imgOverrideCache||{}
+  });
+  fetch(SHEET_URL,{
+    method:'POST',
+    mode:'no-cors',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({type:'save_settings',payload:payload})
+  }).then(function(){_settingsPending=false;}).catch(function(){_settingsPending=false;});
+}
+
+function loadSettingsFromSheet(cb){
+  fetch(SHEET_URL+'?t='+Date.now())
+    .then(function(r){return r.json();})
+    .then(function(res){
+      if(res.result==='success'&&res.payload&&res.payload!=='{}'){
+        var s=JSON.parse(res.payload);
+        if(s.cfg) _cfgCache=Object.assign({},DEF,s.cfg,{disc:Object.assign({},DEF.disc,(s.cfg.disc||{}))});
+        if(s.hidden) _hiddenCache=s.hidden;
+        if(s.imgOverrides) _imgOverrideCache=s.imgOverrides;
+      }
+      if(cb) cb();
+    })
+    .catch(function(){
+      if(cb) cb();
+    });
+}
+
+function cfg(){
+  if(_cfgCache) return _cfgCache;
+  try{var s=JSON.parse(localStorage.getItem('nox_cfg')||'{}');return Object.assign({},DEF,s,{disc:Object.assign({},DEF.disc,s.disc||{})});}catch(e){return DEF;}
+}
+function saveCfg(s){
+  _cfgCache=Object.assign({},DEF,s,{disc:Object.assign({},DEF.disc,s.disc||{})});
+  localStorage.setItem('nox_cfg',JSON.stringify(s));
+  _saveAllSettings();
+}
+function getHidden(){
+  if(_hiddenCache!==null) return _hiddenCache;
+  try{return JSON.parse(localStorage.getItem('nox_hidden')||'[]');}catch(e){return [];}
+}
+function saveHidden(arr){
+  _hiddenCache=arr;
+  localStorage.setItem('nox_hidden',JSON.stringify(arr));
+  _saveAllSettings();
+}
 function isHidden(ref){return getHidden().includes(ref);}
 function toggleHidden(ref){const h=getHidden();const i=h.indexOf(ref);if(i>=0)h.splice(i,1);else h.push(ref);saveHidden(h);}
 function krw(msrp,cat){const c=cfg();const d=(c.disc&&c.disc[cat]!=null)?c.disc[cat]:0;return Math.round(msrp*c.rate*(1-d/100)/100)*100;}
@@ -543,8 +597,6 @@ function renderCart(){
   document.getElementById('totAmt').textContent=fw(cart.reduce(function(s,i){return s+i.p*i.q;},0));
 }
 
-var SHEET_URL='https://script.google.com/macros/s/AKfycby3X6Co_DVbvN36MN5MFncsX-C8-pFtedeaCTRbOqrLlJt5rR1ze2kFyFDYbvdqKvpy/exec';
-
 function submitOrder(){
   if(!cart.length){alert('장바구니가 비어있습니다.');return;}
   var nm=document.getElementById('fn').value.trim();
@@ -668,8 +720,15 @@ function toggleHideItem(ref,row){
 }
 
 // ── IMAGE URL 관리 ────────────────────────────────────
-function getImgOverrides(){try{return JSON.parse(localStorage.getItem('nox_img_overrides')||'{}');}catch{return {};}}
-function saveImgOverrides(obj){localStorage.setItem('nox_img_overrides',JSON.stringify(obj));}
+function getImgOverrides(){
+  if(_imgOverrideCache!==null) return _imgOverrideCache;
+  try{return JSON.parse(localStorage.getItem('nox_img_overrides')||'{}');}catch(e){return {};}
+}
+function saveImgOverrides(obj){
+  _imgOverrideCache=obj;
+  localStorage.setItem('nox_img_overrides',JSON.stringify(obj));
+  _saveAllSettings();
+}
 
 function renderImgList(){
   var q=(document.getElementById('imgSearch').value||'').toLowerCase();
@@ -1054,7 +1113,6 @@ function xlApply(){
   document.getElementById('xlDropZone').innerHTML='<div style="font-family:\'Bebas Neue\',sans-serif;font-size:22px;letter-spacing:2px;color:var(--acc);margin-bottom:8px;">✅ 업데이트 완료</div><div style="font-family:\'DM Mono\',monospace;font-size:10px;color:#555">다음 엑셀 파일을 드래그하여 재업데이트</div>';
 }
 
-// 페이지 로드 시 localStorage 이미지 오버라이드 적용
 // 원본 이미지 URL 저장 (초기화용)
 var _origImg={};
 (function(){
@@ -1062,6 +1120,12 @@ var _origImg={};
     DATA[cat].forEach(function(p){ _origImg[p.ref]=p.img; });
   }
 })();
-applyImgOverrides();
+
+// 페이지 로드 시 Google Sheets에서 세팅 불러온 뒤 렌더링
+loadSettingsFromSheet(function(){
+  applyImgOverrides();
+  renderAll();
+  applyNotice();
+});
 
 </script></body></html>
