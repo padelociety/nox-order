@@ -175,7 +175,7 @@ main{max-width:1200px;margin:0 auto;padding:32px 24px;}
 </nav>
 <div class="subtabs" id="textileSubtabs"></div>
 <main>
-  <div class="notice" id="noticeBar">⚡ 공구기간 2026-04-01 ~ 2026-04-07</div>
+  <div class="notice" id="noticeBar">⚡ 표시 가격은 KRW 공구가입니다 (VAT·배송·관세 별도 안내 예정).</div>
   <div class="page on" id="page-rackets">
     <div class="sec-hdr"><div class="sec-title">PADEL RACKETS</div><div class="sec-cnt" id="cnt-rackets"></div></div>
     <div class="pgrid" id="grid-rackets"></div>
@@ -543,6 +543,8 @@ function renderCart(){
   document.getElementById('totAmt').textContent=fw(cart.reduce(function(s,i){return s+i.p*i.q;},0));
 }
 
+var SHEET_URL='https://script.google.com/macros/s/AKfycby3X6Co_DVbvN36MN5MFncsX-C8-pFtedeaCTRbOqrLlJt5rR1ze2kFyFDYbvdqKvpy/exec';
+
 function submitOrder(){
   if(!cart.length){alert('장바구니가 비어있습니다.');return;}
   var nm=document.getElementById('fn').value.trim();
@@ -552,13 +554,34 @@ function submitOrder(){
   if(!nm||!ph||!em||!ad){alert('필수 정보를 모두 입력해주세요.');return;}
   var tot=cart.reduce(function(s,i){return s+i.p*i.q;},0);
   var lines=cart.map(function(i){return i.n+' ('+i.r+') × '+i.q+' = '+fw(i.p*i.q);}).join('\n');
-  var subj=encodeURIComponent('[NOX 공구] '+nm+' 주문서');
-  var body=encodeURIComponent('NOX 공구 주문서\n일시: '+new Date().toLocaleString('ko-KR')+'\n\n이름: '+nm+'  연락처: '+ph+'\n이메일: '+em+'\n주소: '+ad+'\n메모: '+(document.getElementById('fm').value||'-')+'\n\n'+lines+'\n\nTOTAL: '+fw(tot));
-  window.location.href='mailto:'+(cfg().email||'order@padelsociety.kr')+'?subject='+subj+'&body='+body;
-  document.getElementById('cartCnt').style.display='none';
-  document.getElementById('succMsg').classList.add('on');
-  document.getElementById('succDtl').innerHTML='<strong>'+nm+'</strong>님 주문 완료!<br>이메일 앱에서 전송해주세요.<br><br>'+cart.length+'종 · '+fw(tot);
-  cart=[];updN();
+  var memo=document.getElementById('fm').value||'';
+
+  // 버튼 비활성화 (중복 제출 방지)
+  var btn=document.getElementById('orderBtn');
+  if(btn){btn.disabled=true;btn.textContent='제출 중...';}
+
+  // Google Sheets로 전송
+  fetch(SHEET_URL,{
+    method:'POST',
+    mode:'no-cors',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      name:nm, phone:ph, email:em, address:ad,
+      items:lines, total:tot, memo:memo
+    })
+  }).then(function(){
+    document.getElementById('cartCnt').style.display='none';
+    document.getElementById('succMsg').classList.add('on');
+    document.getElementById('succDtl').innerHTML=
+      '<strong>'+nm+'</strong>님 주문이 접수되었습니다! ✅<br>담당자가 확인 후 연락드릴게요.<br><br>'+cart.length+'종 · '+fw(tot);
+    cart=[];updN();
+  }).catch(function(){
+    // fetch 실패 시 이메일로 폴백
+    var subj=encodeURIComponent('[NOX 공구] '+nm+' 주문서');
+    var body=encodeURIComponent('NOX 공구 주문서\n일시: '+new Date().toLocaleString('ko-KR')+'\n\n이름: '+nm+'  연락처: '+ph+'\n이메일: '+em+'\n주소: '+ad+'\n메모: '+(memo||'-')+'\n\n'+lines+'\n\nTOTAL: '+fw(tot));
+    window.location.href='mailto:'+(cfg().email||'order@padelsociety.kr')+'?subject='+subj+'&body='+body;
+    if(btn){btn.disabled=false;btn.textContent='주문 제출';}
+  });
 }
 
 // ── ADMIN ──────────────────────────────────────────────
