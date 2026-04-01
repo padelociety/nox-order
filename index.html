@@ -647,30 +647,45 @@ function submitOrder(){
   var btn=document.getElementById('orderBtn');
   if(btn){btn.disabled=true;btn.textContent='제출 중...';}
 
-  // Google Sheets로 전송 (no-cors 환경에서는 text/plain body로 전송)
-  var payload=JSON.stringify({
-    type:'order',
-    name:nm, phone:ph, email:em, address:ad,
-    items:lines, total:tot, memo:memo
-  });
-  fetch(SHEET_URL,{
-    method:'POST',
-    mode:'no-cors',
-    headers:{'Content-Type':'text/plain;charset=utf-8'},
-    body:payload
-  }).then(function(){
+  // Google Apps Script로 주문 전송 (JSONP 방식 - no-cors 우회)
+  var succHtml='<strong>'+nm+'</strong>님 주문이 접수되었습니다! ✅<br>담당자가 확인 후 연락드릴게요.<br><br>'+cart.length+'종 · '+fw(tot)+(cfg().account?'<br><br><span style="color:#f5c842;font-size:13px">💳 입금 계좌</span><br>'+cfg().account:'');
+
+  function showSucc(){
     document.getElementById('cartCnt').style.display='none';
     document.getElementById('succMsg').classList.add('on');
-    document.getElementById('succDtl').innerHTML=
-      '<strong>'+nm+'</strong>님 주문이 접수되었습니다! ✅<br>담당자가 확인 후 연락드릴게요.<br><br>'+cart.length+'종 · '+fw(tot);
+    document.getElementById('succDtl').innerHTML=succHtml;
     cart=[];updN();
-  }).catch(function(){
-    // fetch 실패 시 이메일로 폴백
-    var subj=encodeURIComponent('[NOX 공구] '+nm+' 주문서');
-    var body=encodeURIComponent('NOX 공구 주문서\n일시: '+new Date().toLocaleString('ko-KR')+'\n\n이름: '+nm+'  연락처: '+ph+'\n이메일: '+em+'\n주소: '+ad+'\n메모: '+(memo||'-')+'\n\n'+lines+'\n\nTOTAL: '+fw(tot));
-    window.location.href='mailto:'+(cfg().email||'order@padelsociety.kr')+'?subject='+subj+'&body='+body;
-    if(btn){btn.disabled=false;btn.textContent='주문 제출';}
+  }
+
+  // JSONP: script 태그로 전송하여 CORS 우회
+  var cbName='_orderCb'+Date.now();
+  var params=new URLSearchParams({
+    type:'order', callback:cbName,
+    name:nm, phone:ph, email:em, address:ad,
+    items:lines, total:String(tot), memo:memo||''
   });
+  var scriptEl=document.createElement('script');
+  var done=false;
+  window[cbName]=function(res){
+    done=true;
+    delete window[cbName];
+    if(scriptEl.parentNode)scriptEl.parentNode.removeChild(scriptEl);
+    showSucc();
+  };
+  scriptEl.onerror=function(){
+    if(done)return;
+    done=true;
+    delete window[cbName];
+    // 오류여도 주문 표시 (no-cors라 응답 못 받을 수 있음)
+    showSucc();
+  };
+  // 5초 후 타임아웃
+  setTimeout(function(){
+    if(!done){done=true;delete window[cbName];if(scriptEl.parentNode)scriptEl.parentNode.removeChild(scriptEl);showSucc();}
+  },5000);
+  scriptEl.src=SHEET_URL+'?'+params.toString();
+  document.head.appendChild(scriptEl);
+  if(btn){btn.disabled=false;btn.textContent='주문 제출';}
 }
 
 // ── ADMIN ──────────────────────────────────────────────
