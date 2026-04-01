@@ -630,7 +630,7 @@ function renderCart(){
   document.getElementById('totAmt').textContent=fw(cart.reduce(function(s,i){return s+i.p*i.q;},0));
 }
 
-var SHEET_URL='https://script.google.com/macros/s/AKfycby3X6Co_DVbvN36MN5MFncsX-C8-pFtedeaCTRbOqrLlJt5rR1ze2kFyFDYbvdqKvpy/exec';
+var SHEET_URL='https://script.google.com/macros/s/AKfycbyblca5LJl0gZrqQiAP2gK09Q6DX__pfhoZP2eLlLhx7nAe4kfYLSVouhRB5obVPn_L/exec';
 
 function submitOrder(){
   if(!cart.length){alert('장바구니가 비어있습니다.');return;}
