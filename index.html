@@ -649,6 +649,7 @@ function submitOrder(){
 
   // Google Sheets로 전송 (no-cors 환경에서는 text/plain body로 전송)
   var payload=JSON.stringify({
+    type:'order',
     name:nm, phone:ph, email:em, address:ad,
     items:lines, total:tot, memo:memo
   });
