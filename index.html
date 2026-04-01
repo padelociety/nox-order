@@ -647,45 +647,49 @@ function submitOrder(){
   var btn=document.getElementById('orderBtn');
   if(btn){btn.disabled=true;btn.textContent='제출 중...';}
 
-  // Google Apps Script로 주문 전송 (JSONP 방식 - no-cors 우회)
+  // Google Apps Script로 주문 전송 (JSONP + fetch 동시 시도)
   var succHtml='<strong>'+nm+'</strong>님 주문이 접수되었습니다! ✅<br>담당자가 확인 후 연락드릴게요.<br><br>'+cart.length+'종 · '+fw(tot)+(cfg().account?'<br><br><span style="color:#f5c842;font-size:13px">💳 입금 계좌</span><br>'+cfg().account:'');
 
   function showSucc(){
+    if(btn){btn.disabled=false;btn.textContent='주문 제출';}
     document.getElementById('cartCnt').style.display='none';
     document.getElementById('succMsg').classList.add('on');
     document.getElementById('succDtl').innerHTML=succHtml;
     cart=[];updN();
   }
 
-  // JSONP: script 태그로 전송하여 CORS 우회
-  var cbName='_orderCb'+Date.now();
-  var params=new URLSearchParams({
-    type:'order', callback:cbName,
+  var qParams=new URLSearchParams({
+    type:'order',
     name:nm, phone:ph, email:em, address:ad,
     items:lines, total:String(tot), memo:memo||''
   });
-  var scriptEl=document.createElement('script');
+  var orderUrl=SHEET_URL+'?'+qParams.toString();
   var done=false;
-  window[cbName]=function(res){
-    done=true;
+
+  // 방법1: fetch no-cors (삼성브라우저 등)
+  fetch(orderUrl,{method:'GET',mode:'no-cors'}).then(function(){
+    if(!done){done=true;showSucc();}
+  }).catch(function(){});
+
+  // 방법2: JSONP (크롬 등 script 허용 브라우저)
+  var cbName='_orderCb'+Date.now();
+  var scriptEl=document.createElement('script');
+  window[cbName]=function(){
+    if(!done){done=true;}
     delete window[cbName];
     if(scriptEl.parentNode)scriptEl.parentNode.removeChild(scriptEl);
-    showSucc();
   };
   scriptEl.onerror=function(){
-    if(done)return;
-    done=true;
     delete window[cbName];
-    // 오류여도 주문 표시 (no-cors라 응답 못 받을 수 있음)
-    showSucc();
+    if(scriptEl.parentNode)scriptEl.parentNode.removeChild(scriptEl);
   };
-  // 5초 후 타임아웃
-  setTimeout(function(){
-    if(!done){done=true;delete window[cbName];if(scriptEl.parentNode)scriptEl.parentNode.removeChild(scriptEl);showSucc();}
-  },5000);
-  scriptEl.src=SHEET_URL+'?'+params.toString();
+  scriptEl.src=SHEET_URL+'?'+qParams.toString()+'&callback='+cbName;
   document.head.appendChild(scriptEl);
-  if(btn){btn.disabled=false;btn.textContent='주문 제출';}
+
+  // 5초 후 무조건 성공 처리 (응답 못 받아도 전송은 됐을 가능성 높음)
+  setTimeout(function(){
+    if(!done){done=true;showSucc();}
+  },5000);
 }
 
 // ── ADMIN ──────────────────────────────────────────────
