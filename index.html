@@ -248,6 +248,7 @@ main{max-width:1200px;margin:0 auto;padding:32px 24px;}
           <div class="atab on" onclick="showAtab('pricing',this)">가격 설정</div>
           <div class="atab" onclick="showAtab('visibility',this)">상품 노출 관리</div>
           <div class="atab" onclick="showAtab('images',this)">이미지 URL 관리</div>
+          <div class="atab" onclick="showAtab('names',this)">상품명 수정</div>
           <div class="atab" onclick="showAtab('excel',this)">📥 엑셀 업데이트</div>
           <div class="atab" onclick="showAtab('general',this)">기타</div>
         </div>
@@ -342,6 +343,26 @@ main{max-width:1200px;margin:0 auto;padding:32px 24px;}
           </div>
         </div>
 
+        <!-- 상품명 수정 패널 -->
+        <div class="apanel" id="apanel-names">
+          <div class="asec">
+            <div class="asec-t">상품명 수정</div>
+            <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+              <input id="nameSearch" class="ftxt" style="flex:1;min-width:200px" placeholder="제품명 또는 REF 검색..." oninput="renderNameList()">
+              <select id="nameCatFilter" class="ftxt" style="width:140px" onchange="renderNameList()">
+                <option value="all">전체 카테고리</option>
+                <option value="rackets">라켓</option>
+                <option value="bags">가방</option>
+                <option value="shoes">신발</option>
+                <option value="accessories">액세서리</option>
+                <option value="textile">텍스타일</option>
+              </select>
+            </div>
+            <div style="font-size:11px;color:var(--dim);margin-bottom:10px">수정된 상품명은 공구 화면과 주문서에 바로 반영됩니다.</div>
+            <div id="nameList" style="display:flex;flex-direction:column;gap:6px;max-height:60vh;overflow-y:auto"></div>
+          </div>
+        </div>
+
         <button class="save-btn" style="margin-top:8px" onclick="saveAll()">💾 저장 및 적용</button>
       </div>
     </div>
@@ -368,7 +389,8 @@ function _saveAllSettings(){
   var payload=JSON.stringify({
     cfg:_cfgCache,
     hidden:_hiddenCache||[],
-    imgOverrides:_imgOverrideCache||{}
+    imgOverrides:_imgOverrideCache||{},
+    nameOverrides:_nameOverrideCache||{}
   });
   fetch(SHEET_URL,{
     method:'POST',
@@ -387,6 +409,7 @@ function loadSettingsFromSheet(cb){
         if(s.cfg) _cfgCache=Object.assign({},DEF,s.cfg,{disc:Object.assign({},DEF.disc,(s.cfg.disc||{}))});
         if(s.hidden) _hiddenCache=s.hidden;
         if(s.imgOverrides) _imgOverrideCache=s.imgOverrides;
+        if(s.nameOverrides) _nameOverrideCache=s.nameOverrides;
       }
       if(cb) cb();
     })
@@ -689,6 +712,7 @@ function showAtab(id,tab){
   tab.classList.add('on');document.getElementById('apanel-'+id).classList.add('on');
   if(id==='visibility')renderHideList();
   if(id==='images')renderImgList();
+  if(id==='names')renderNameList();
 }
 function filterHide(cat,btn){
   hideFilterCat=cat;
@@ -807,6 +831,79 @@ function applyImgOverrides(){
   for(var cat in DATA){
     DATA[cat].forEach(function(p){if(overrides[p.ref])p.img=overrides[p.ref];});
   }
+}
+
+// ── 상품명 관리 ──────────────────────────────────────────
+var _nameOverrideCache=null;
+var _origName={};
+
+function getNameOverrides(){
+  if(_nameOverrideCache!==null) return _nameOverrideCache;
+  try{return JSON.parse(localStorage.getItem('nox_name_overrides')||'{}');}catch(e){return {};}
+}
+function saveNameOverrides(obj){
+  _nameOverrideCache=obj;
+  localStorage.setItem('nox_name_overrides',JSON.stringify(obj));
+  _saveAllSettings();
+}
+function applyNameOverrides(){
+  var ov=getNameOverrides();
+  for(var cat in DATA){
+    DATA[cat].forEach(function(p){if(ov[p.ref])p.name=ov[p.ref];});
+  }
+}
+function renderNameList(){
+  var q=(document.getElementById('nameSearch').value||'').toLowerCase();
+  var cat=document.getElementById('nameCatFilter').value;
+  var overrides=getNameOverrides();
+  var items=allItems();
+  if(cat!=='all') items=items.filter(function(p){return p.cat===cat;});
+  if(q) items=items.filter(function(p){return p.name.toLowerCase().includes(q)||p.ref.toLowerCase().includes(q);});
+  var html='';
+  items.slice(0,150).forEach(function(p){
+    var isOv=!!overrides[p.ref];
+    var origName=(_origName[p.ref]||p.name);
+    var safeName=p.name.replace(/"/g,'&quot;');
+    var border=isOv?'var(--acc)':'var(--bdr)';
+    var badge=isOv?' <span style="color:#4caf50;font-size:9px">&#10003; 수정됨</span>':'';
+    var origLine=isOv?('<div style="font-size:10px;color:var(--dim);margin-bottom:4px">원본: '+origName+'</div>'):'';
+    var applyBtn='<button class="save-btn" style="padding:4px 10px;font-size:11px;min-width:50px" onclick="applyName(this)">적용</button>';
+    var resetBtn=isOv?('<button class="save-btn" style="padding:4px 10px;font-size:11px;background:#333;min-width:50px" onclick="resetName(this)">초기화</button>'):'';
+    html+='<div style="display:flex;gap:10px;align-items:center;padding:8px;background:var(--card);border-radius:6px;border:1px solid '+border+'" data-ref="'+p.ref+'">'+
+      '<div style="flex:1;min-width:0">'+
+        '<div style="font-size:10px;color:var(--acc);margin-bottom:2px">'+p.ref+badge+'</div>'+
+        origLine+
+        '<input class="ftxt" style="width:100%;font-size:12px;padding:4px 8px" value="'+safeName+'" data-ref="'+p.ref+'">'+
+      '</div>'+
+      '<div style="display:flex;flex-direction:column;gap:4px">'+applyBtn+resetBtn+'</div>'+
+    '</div>';
+  });
+  document.getElementById('nameList').innerHTML=html;
+}
+function applyName(btn){
+  var row=btn.closest('[data-ref]');
+  var ref=row.getAttribute('data-ref');
+  var val=row.querySelector('input[data-ref]').value.trim();
+  if(!val) return;
+  var overrides=getNameOverrides();
+  overrides[ref]=val;
+  for(var cat in DATA){DATA[cat].forEach(function(p){if(p.ref===ref)p.name=val;});}
+  saveNameOverrides(overrides);
+  renderAll();
+  renderNameList();
+  showToast('&#10003; 상품명 저장됨: '+ref);
+}
+function resetName(btn){
+  var row=btn.closest('[data-ref]');
+  var ref=row.getAttribute('data-ref');
+  var overrides=getNameOverrides();
+  var orig=_origName[ref];
+  delete overrides[ref];
+  if(orig){for(var cat in DATA){DATA[cat].forEach(function(p){if(p.ref===ref)p.name=orig;});}}
+  saveNameOverrides(overrides);
+  renderAll();
+  renderNameList();
+  showToast('초기화됨: '+ref);
 }
 
 function showToast(msg){
@@ -1125,13 +1222,14 @@ function xlApply(){
 var _origImg={};
 (function(){
   for(var cat in DATA){
-    DATA[cat].forEach(function(p){ _origImg[p.ref]=p.img; });
+    DATA[cat].forEach(function(p){ _origImg[p.ref]=p.img; _origName[p.ref]=p.name; });
   }
 })();
 
 // 페이지 로드 시 Google Sheets에서 세팅 불러온 뒤 렌더링
 loadSettingsFromSheet(function(){
   applyImgOverrides();
+  applyNameOverrides();
   renderAll();
   applyNotice();
 });
