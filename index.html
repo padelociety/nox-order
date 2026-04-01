@@ -250,6 +250,7 @@ main{max-width:1200px;margin:0 auto;padding:32px 24px;}
         <div class="adm-tabs">
           <div class="atab on" onclick="showAtab('pricing',this)">가격 설정</div>
           <div class="atab" onclick="showAtab('visibility',this)">상품 노출 관리</div>
+          <div class="atab" onclick="showAtab('names',this)">상품명 변경</div>
           <div class="atab" onclick="showAtab('images',this)">이미지 URL 관리</div>
           <div class="atab" onclick="showAtab('excel',this)">📥 엑셀 업데이트</div>
           <div class="atab" onclick="showAtab('general',this)">기타</div>
@@ -326,6 +327,26 @@ main{max-width:1200px;margin:0 auto;padding:32px 24px;}
           </div>
         </div>
 
+        <!-- 상품명 변경 패널 -->
+        <div class="apanel" id="apanel-names">
+          <div class="asec">
+            <div class="asec-t">상품명 변경</div>
+            <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+              <input id="nameSearch" class="ftxt" style="flex:1;min-width:200px" placeholder="제품명 또는 REF 검색..." oninput="renderNameList()">
+              <select id="nameCatFilter" class="ftxt" style="width:140px" onchange="renderNameList()">
+                <option value="all">전체 카테고리</option>
+                <option value="rackets">라켓</option>
+                <option value="bags">가방</option>
+                <option value="shoes">신발</option>
+                <option value="accessories">액세서리</option>
+                <option value="textile">텍스타일</option>
+              </select>
+            </div>
+            <div style="font-size:11px;color:var(--dim);margin-bottom:10px">상품명을 직접 수정할 수 있습니다. Enter 또는 적용 버튼으로 저장.</div>
+            <div id="nameList" style="display:flex;flex-direction:column;gap:8px;max-height:60vh;overflow-y:auto"></div>
+          </div>
+        </div>
+
         <!-- 이미지 URL 관리 패널 -->
         <div class="apanel" id="apanel-images">
           <div class="asec">
@@ -364,6 +385,7 @@ const DEF={rate:1550,disc:{rackets:30,shoes:25,bags:25,accessories:20,textile:20
 var _settings = Object.assign({}, DEF, {disc: Object.assign({}, DEF.disc)});
 var _hidden = [];
 var _imgOverrides = {};
+var _nameOverrides = {};
 
 function cfg(){return _settings;}
 function saveCfg(s){
@@ -383,7 +405,8 @@ function _syncToSheet(){
   var payload = JSON.stringify({
     cfg: _settings,
     hidden: _hidden,
-    imgOverrides: _imgOverrides
+    imgOverrides: _imgOverrides,
+    nameOverrides: _nameOverrides
   });
   fetch(SHEET_URL, {
     method:'POST',
@@ -408,6 +431,7 @@ function loadSettingsFromSheet(callback){
           }
           if(saved.hidden) _hidden = saved.hidden;
           if(saved.imgOverrides) _imgOverrides = saved.imgOverrides;
+          if(saved.nameOverrides) _nameOverrides = saved.nameOverrides;
         }catch(e){console.warn('설정 파싱 오류:', e);}
       }
       if(callback) callback();
@@ -694,6 +718,7 @@ function showAtab(id,tab){
   tab.classList.add('on');document.getElementById('apanel-'+id).classList.add('on');
   if(id==='visibility')renderHideList();
   if(id==='images')renderImgList();
+  if(id==='names')renderNameList();
 }
 function filterHide(cat,btn){
   hideFilterCat=cat;
@@ -800,6 +825,69 @@ function resetImgUrl(ref){
   showToast('초기화됨: '+ref);
 }
 
+function getNameOverrides(){return _nameOverrides;}
+function saveNameOverrides(obj){_nameOverrides = obj; _syncToSheet();}
+
+function applyNameOverrides(){
+  var overrides=getNameOverrides();
+  for(var cat in DATA){
+    DATA[cat].forEach(function(p){
+      if(overrides[p.ref]) p.name=overrides[p.ref];
+    });
+  }
+}
+
+function renderNameList(){
+  var q=(document.getElementById('nameSearch').value||'').toLowerCase();
+  var cat=document.getElementById('nameCatFilter').value;
+  var overrides=getNameOverrides();
+  var items=allItems();
+  if(cat!=='all') items=items.filter(function(p){return p.cat===cat;});
+  if(q) items=items.filter(function(p){return p.name.toLowerCase().includes(q)||p.ref.toLowerCase().includes(q);});
+  var list=document.getElementById('nameList');
+  list.innerHTML=items.slice(0,200).map(function(p){
+    var isOverridden=!!overrides[p.ref];
+    var curName=overrides[p.ref]||p.name;
+    return '<div style="display:flex;gap:10px;align-items:center;padding:8px;background:var(--card);border-radius:6px;border:1px solid '+(isOverridden?'var(--acc)':'var(--bdr)')+'" id="namerow-'+p.ref+'">'+
+      '<div style="flex:1;min-width:0">'+
+        '<div style="font-size:11px;color:var(--acc);font-family:\'DM Mono\',monospace;margin-bottom:2px">'+p.ref+(isOverridden?' <span style="color:#4caf50;font-size:9px">✓ 수정됨</span>':'')+'</div>'+
+        '<input class="ftxt" style="width:100%;font-size:12px;padding:4px 8px" value="'+curName.replace(/"/g,'&quot;')+'" id="namestr-'+p.ref+'" onkeydown="if(event.key===\'Enter\')applyNameStr(\''+p.ref+'\')">'+
+      '</div>'+
+      '<div style="display:flex;flex-direction:column;gap:4px">'+
+        '<button class="save-btn" style="padding:4px 10px;font-size:11px;min-width:60px" onclick="applyNameStr(\''+p.ref+'\')">적용</button>'+
+        (isOverridden?'<button class="save-btn" style="padding:4px 10px;font-size:11px;background:#333;min-width:60px" onclick="resetNameStr(\''+p.ref+'\')">초기화</button>':'<div></div>')+
+      '</div>'+
+    '</div>';
+  }).join('');
+}
+
+function applyNameStr(ref){
+  var val=document.getElementById('namestr-'+ref).value.trim();
+  if(!val) return;
+  var overrides=getNameOverrides();
+  overrides[ref]=val;
+  for(var cat in DATA){
+    DATA[cat].forEach(function(p){if(p.ref===ref)p.name=val;});
+  }
+  saveNameOverrides(overrides);
+  renderAll();
+  renderNameList();
+  showToast('✅ 상품명 적용됨: '+ref);
+}
+
+function resetNameStr(ref){
+  var overrides=getNameOverrides();
+  delete overrides[ref];
+  saveNameOverrides(overrides);
+  // 원래 이름으로 복원
+  for(var cat in DATA){
+    DATA[cat].forEach(function(p){if(p.ref===ref)p.name=_origNames[p.ref]||p.name;});
+  }
+  renderAll();
+  renderNameList();
+  showToast('초기화됨: '+ref);
+}
+
 function applyImgOverrides(){
   var overrides=getImgOverrides();
   for(var cat in DATA){
@@ -846,11 +934,12 @@ document.getElementById('admOvl').addEventListener('click',function(e){if(e.targ
 
 // 구글시트에서 설정 불러온 후 렌더링
 loadSettingsFromSheet(function(){
-  // _origImg 저장 (이미지 초기화용)
+  // _origImg, _origNames 저장 (초기화용)
   for(var cat in DATA){
-    DATA[cat].forEach(function(p){ _origImg[p.ref]=p.img; });
+    DATA[cat].forEach(function(p){ _origImg[p.ref]=p.img; _origNames[p.ref]=p.name; });
   }
   applyImgOverrides();
+  applyNameOverrides();
   renderAll();
   applyNotice();
   applyAccount();
@@ -1133,5 +1222,6 @@ function xlApply(){
 
 // _origImg: 이미지 초기화용 (loadSettingsFromSheet 콜백에서 초기화)
 var _origImg={};
+var _origNames={};
 
 </script></body></html>
