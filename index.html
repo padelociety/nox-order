@@ -116,7 +116,10 @@ main{max-width:1200px;margin:0 auto;padding:32px 24px;}
 .finp,.ftxt{background:var(--bg);border:1px solid var(--bdr);color:var(--txt);font-family:'Noto Sans KR',sans-serif;font-size:14px;padding:10px 12px;outline:none;width:100%;}
 .finp:focus,.ftxt:focus{border-color:var(--acc);}
 .ftxt{resize:vertical;min-height:80px;}
-.sub-btn{background:var(--acc);color:#000;border:none;padding:16px;font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:3px;cursor:pointer;width:100%;margin-top:16px;}
+.sub-btn{background:var(--acc);color:#000;border:none;padding:16px;font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:3px;cursor:pointer;width:100%;margin-top:16px;transition:opacity .2s;}
+.sub-btn:disabled{opacity:.7;cursor:not-allowed;}
+.sub-btn .spinner{display:inline-block;width:16px;height:16px;border:2px solid #000;border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:8px;}
+@keyframes spin{to{transform:rotate(360deg);}}
 .ftit{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:2px;margin-bottom:16px;color:var(--dim);}
 .succ{display:none;text-align:center;padding:32px;}.succ.on{display:block;}
 .succ-t{font-family:'Bebas Neue',sans-serif;font-size:32px;letter-spacing:4px;color:var(--acc);margin-bottom:8px;}
@@ -228,7 +231,7 @@ main{max-width:1200px;margin:0 auto;padding:32px 24px;}
             <div class="fgrp full"><label class="flbl">배송지 *</label><input class="finp" id="fa" type="text" placeholder="서울시 ..."></div>
             <div class="fgrp full"><label class="flbl">메모</label><textarea class="ftxt" id="fm" placeholder="기타 요청사항"></textarea></div>
           </div>
-          <button class="sub-btn" onclick="submitOrder()">주문 제출하기</button>
+          <button class="sub-btn" id="orderBtn" onclick="submitOrder()">주문서 제출하기</button>
         </div>
       </div>
     </div>
@@ -645,13 +648,13 @@ function submitOrder(){
 
   // 버튼 비활성화 (중복 제출 방지)
   var btn=document.getElementById('orderBtn');
-  if(btn){btn.disabled=true;btn.textContent='제출 중...';}
+  if(btn){btn.disabled=true;btn.innerHTML='<span class="spinner"></span>주문서 제출 중...';}
 
   // Google Apps Script로 주문 전송 (JSONP + fetch 동시 시도)
   var succHtml='<strong>'+nm+'</strong>님 주문이 접수되었습니다! ✅<br>담당자가 확인 후 연락드릴게요.<br><br>'+cart.length+'종 · '+fw(tot)+(cfg().account?'<br><br><span style="color:#f5c842;font-size:13px">💳 입금 계좌</span><br>'+cfg().account:'');
 
   function showSucc(){
-    if(btn){btn.disabled=false;btn.textContent='주문 제출';}
+    if(btn){btn.disabled=false;btn.innerHTML='주문서 제출하기';}
     document.getElementById('cartCnt').style.display='none';
     document.getElementById('succMsg').classList.add('on');
     document.getElementById('succDtl').innerHTML=succHtml;
