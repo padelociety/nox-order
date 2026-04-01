@@ -618,6 +618,7 @@ function submitOrder(){
     mode:'no-cors',
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify({
+      type:'order',
       name:nm, phone:ph, email:em, address:ad,
       items:lines, total:tot, memo:memo
     })
