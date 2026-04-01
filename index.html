@@ -96,6 +96,12 @@ main{max-width:1200px;margin:0 auto;padding:32px 24px;}
 .ctbl{width:100%;border-collapse:collapse;}
 .ctbl th{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);text-align:left;padding:7px 4px;border-bottom:1px solid var(--bdr);}
 .ctbl td{padding:9px 4px;border-bottom:1px solid var(--bdr);font-size:13px;vertical-align:middle;}
+.ctbl td:first-child{max-width:30vw;word-break:keep-all;white-space:normal;line-height:1.4;}
+@media(max-width:500px){
+  .ctbl td{font-size:11px;padding:7px 3px;}
+  .ctbl td:first-child{max-width:28vw;font-size:11px;}
+  .ctbl th{font-size:8px;}
+}
 .rm{background:none;border:none;color:var(--dim);cursor:pointer;font-size:16px;padding:0 4px;}
 .rm:hover{color:var(--red);}
 .tot-row{display:flex;justify-content:space-between;align-items:center;padding:16px 0;border-top:1px solid var(--bdr);margin-top:8px;}
@@ -207,7 +213,12 @@ main{max-width:1200px;margin:0 auto;padding:32px 24px;}
       <div id="cartCnt">
         <div class="empty" id="emptyMsg" style="display:none">장바구니가 비어있습니다</div>
         <table class="ctbl" id="cartTbl"><thead><tr><th>제품</th><th>REF</th><th>단가</th><th>수량</th><th>소계</th><th></th></tr></thead><tbody id="cartBody"></tbody></table>
-        <div class="tot-row" id="totRow"><div class="tot-lbl">TOTAL</div><div class="tot-amt" id="totAmt">₩0</div></div>
+        <div style="background:#0d1a00;border:1px solid var(--acc);border-radius:6px;padding:12px 16px;margin-bottom:12px;font-size:13px;line-height:1.8">
+            <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--acc);letter-spacing:1px;margin-bottom:4px">💳 입금 계좌</div>
+            <div style="color:#fff;font-weight:600">카카오뱅크 3333-31-9062690</div>
+            <div style="color:#aaa;font-size:12px">예금주: 구하경 (일상스포츠)</div>
+          </div>
+          <div class="tot-row" id="totRow"><div class="tot-lbl">TOTAL</div><div class="tot-amt" id="totAmt">₩0</div></div>
         <div style="margin-top:24px">
           <div class="ftit">주문자 정보</div>
           <div class="fgrid">
@@ -582,7 +593,7 @@ function renderCart(){
   empty.style.display='none';tbl.style.display='table';trow.style.display='flex';
   body.innerHTML=cart.map(function(it,i){
     return '<tr>'+
-      '<td style="max-width:150px;word-break:break-word;font-size:12px">'+it.n+'</td>'+
+      '<td style="max-width:120px;word-break:break-all;white-space:normal;font-size:12px;line-height:1.4">'+it.n+'</td>'+
       '<td style="font-family:\'DM Mono\',monospace;font-size:10px;color:#555">'+it.r+'</td>'+
       '<td style="font-family:\'DM Mono\',monospace;white-space:nowrap">'+fw(it.p)+'</td>'+
       '<td><div class="cart-qty">'+
@@ -618,7 +629,6 @@ function submitOrder(){
     mode:'no-cors',
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify({
-      type:'order',
       name:nm, phone:ph, email:em, address:ad,
       items:lines, total:tot, memo:memo
     })
@@ -626,7 +636,14 @@ function submitOrder(){
     document.getElementById('cartCnt').style.display='none';
     document.getElementById('succMsg').classList.add('on');
     document.getElementById('succDtl').innerHTML=
-      '<strong>'+nm+'</strong>님 주문이 접수되었습니다! ✅<br>담당자가 확인 후 연락드릴게요.<br><br>'+cart.length+'종 · '+fw(tot);
+      '<strong>'+nm+'</strong>님 주문이 접수되었습니다! ✅<br>'+
+      '담당자가 확인 후 연락드릴게요.<br><br>'+
+      cart.length+'종 · '+fw(tot)+
+      '<div style="margin-top:16px;background:#0d1a00;border:1px solid var(--acc);border-radius:6px;padding:12px 16px;font-size:13px;line-height:1.8;text-align:left">'+
+        '<div style="font-family:\'DM Mono\',monospace;font-size:10px;color:var(--acc);letter-spacing:1px;margin-bottom:4px">💳 입금 계좌</div>'+
+        '<div style="color:#fff;font-weight:600">카카오뱅크 3333-31-9062690</div>'+
+        '<div style="color:#aaa;font-size:12px">예금주: 구하경 (일상스포츠)</div>'+
+      '</div>';
     cart=[];updN();
   }).catch(function(){
     // fetch 실패 시 이메일로 폴백
