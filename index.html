@@ -163,9 +163,22 @@ main{max-width:1200px;margin:0 auto;padding:32px 24px;}
 .hf-btn{font-family:'DM Mono',monospace;font-size:9px;padding:4px 10px;border:1px solid var(--bdr);color:var(--dim);background:none;cursor:pointer;}
 .hf-btn.on{border-color:var(--acc);color:var(--acc);}
 @media(max-width:600px){.fgrid{grid-template-columns:1fr;}.pgrid{grid-template-columns:1fr 1fr;}main{padding:16px;}}
+#loadingOverlay{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;transition:opacity 0.4s;}
+#loadingOverlay.hide{opacity:0;pointer-events:none;}
+.ld-logo{font-family:'Bebas Neue',sans-serif;font-size:36px;letter-spacing:6px;color:var(--acc);}
+.ld-logo span{color:var(--txt);}
+.ld-bar{width:160px;height:2px;background:#1a1a1a;border-radius:2px;overflow:hidden;}
+.ld-bar-inner{height:100%;width:30%;background:var(--acc);border-radius:2px;animation:ldslide 1s ease-in-out infinite alternate;}
+.ld-txt{font-family:'DM Mono',monospace;font-size:11px;color:var(--dim);letter-spacing:1px;}
+@keyframes ldslide{from{transform:translateX(-30%);}to{transform:translateX(320%);}}
 </style>
 </head>
 <body>
+<div id="loadingOverlay">
+  <div class="ld-logo">NOX <span>Padel</span></div>
+  <div class="ld-bar"><div class="ld-bar-inner"></div></div>
+  <div class="ld-txt">가격 정보 불러오는 중...</div>
+</div>
 <header>
   <div class="logo">NOX <span>공구</span></div>
   <div class="hright">
@@ -937,6 +950,7 @@ document.getElementById('admOvl').addEventListener('click',function(e){if(e.targ
 
 // 구글시트에서 설정 불러온 후 렌더링
 loadSettingsFromSheet(function(){
+  var ov=document.getElementById('loadingOverlay');if(ov){ov.classList.add('hide');setTimeout(function(){ov.style.display='none';},400);}
   // _origImg, _origNames 저장 (초기화용)
   for(var cat in DATA){
     DATA[cat].forEach(function(p){ _origImg[p.ref]=p.img; _origNames[p.ref]=p.name; });
